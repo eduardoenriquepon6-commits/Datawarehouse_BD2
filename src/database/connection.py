@@ -2,29 +2,22 @@ import pyodbc
 from config import OLTP_CONN_STRING, OLAP_CONN_STRING
 
 
-def obtener_conexion_oltp():
+def _conectar(conn_string, nombre_bd):
     try:
-        conexion = pyodbc.connect(OLTP_CONN_STRING)
+        conexion = pyodbc.connect(conn_string)
         return conexion
-    except pyodbc.InterfaceError:
-        print("\n[Error de Conexion] No se pudo encontrar el controlador (Driver) ODBC de SQL Server.")
-        print("Asegurate de tener instalado 'ODBC Driver 17 for SQL Server'.\n")
+    except pyodbc.Error as e:
+        sqlstate = e.args[0] if e.args else None
+        if sqlstate == 'IM002':
+            print(f"\n[Error de Conexion] No se pudo encontrar el controlador de base de datos necesario.\n")
+        else:
+            print(f"\n[Fallo de conexion en {nombre_bd}]: No se pudo conectar a la base de datos.\n")
         return None
-    except pyodbc.DatabaseError as e:
-        print(f"\n[Fallo de conexion en Origen]: No se pudo conectar a la base de datos OLTP.")
-        print(f"Detalle tecnico: {e}\n")
-        return None
+
+
+def obtener_conexion_oltp():
+    return _conectar(OLTP_CONN_STRING, "Origen (OLTP)")
 
 
 def obtener_conexion_olap():
-    try:
-        conexion = pyodbc.connect(OLAP_CONN_STRING)
-        return conexion
-    except pyodbc.InterfaceError:
-        print("\n[Error de Conexion] No se pudo encontrar el controlador (Driver) ODBC de SQL Server.")
-        print("Asegurate de tener instalado 'ODBC Driver 17 for SQL Server'.\n")
-        return None
-    except pyodbc.DatabaseError as e:
-        print(f"\n[Fallo de conexion en Destino]: No se pudo conectar a la base de datos OLAP (DW).")
-        print(f"Detalle tecnico: {e}\n")
-        return None
+    return _conectar(OLAP_CONN_STRING, "Destino (OLAP/DW)")
