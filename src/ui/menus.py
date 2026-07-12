@@ -67,6 +67,80 @@ def seleccionar_columnas(columnas_con_tipo: list) -> list:
     return seleccionadas if seleccionadas else []
 
 
+def menu_configurar_transformaciones(df, clasificacion):
+    todas = list(df.columns)
+    if not todas:
+        return []
+
+    cols_a_transformar = questionary.checkbox(
+        "Seleccione las columnas que desea transformar (ESPACIO para marcar, Enter para continuar):",
+        choices=[questionary.Choice(c, value=c) for c in todas]
+    ).ask()
+
+    if not cols_a_transformar:
+        return []
+
+    configs = []
+    for col in cols_a_transformar:
+        tipo = _determinar_tipo_columna(col, clasificacion)
+        config = _menu_transformacion_columna(col, tipo)
+        if config:
+            configs.append(config)
+    return configs
+
+
+def _determinar_tipo_columna(columna, clasificacion):
+    for tipo, cols in clasificacion.items():
+        if columna in cols:
+            return tipo
+    return 'otros'
+
+
+def _menu_transformacion_columna(columna, tipo):
+    if tipo == 'fecha':
+        seleccion = questionary.select(
+            f"Transformacion para columna de fecha '{columna}':",
+            choices=[
+                questionary.Choice("Extraer solo el año", value="year"),
+                questionary.Choice("Extraer solo el mes", value="month"),
+                questionary.Choice("Extraer solo el dia", value="day"),
+                questionary.Choice("Extraer solo la hora", value="hour"),
+                questionary.Choice("Saltar esta columna", value="saltar")
+            ]
+        ).ask()
+        if seleccion and seleccion != "saltar":
+            return {'columna': columna, 'tipo': 'extraer_fecha', 'valor': seleccion}
+    elif tipo == 'texto':
+        seleccion = questionary.select(
+            f"Transformacion para columna de texto '{columna}':",
+            choices=[
+                questionary.Choice("Convertir a mayuscula", value="mayuscula"),
+                questionary.Choice("Convertir a minuscula", value="minuscula"),
+                questionary.Choice("Concatenar con texto adicional", value="concatenar"),
+                questionary.Choice("Saltar esta columna", value="saltar")
+            ]
+        ).ask()
+        if seleccion == "concatenar":
+            valor = questionary.text(f"Ingrese el texto a concatenar al final del campo '{columna}':").ask()
+            if valor is not None:
+                return {'columna': columna, 'tipo': 'concatenar', 'valor': valor}
+        elif seleccion and seleccion != "saltar":
+            return {'columna': columna, 'tipo': seleccion}
+    else:
+        seleccion = questionary.select(
+            f"Transformacion para columna '{columna}':",
+            choices=[
+                questionary.Choice("Concatenar con texto adicional", value="concatenar"),
+                questionary.Choice("Saltar esta columna", value="saltar")
+            ]
+        ).ask()
+        if seleccion == "concatenar":
+            valor = questionary.text(f"Ingrese el texto a concatenar al final del campo '{columna}':").ask()
+            if valor is not None:
+                return {'columna': columna, 'tipo': 'concatenar', 'valor': valor}
+    return None
+
+
 def ingresar_sql_custom() -> str:
     console.print("[bold yellow]Instrucciones:[/bold yellow] Escriba o pegue su consulta SQL.")
     console.print("Para finalizar, presione [bold]Enter[/bold] dos veces seguidas.\n")

@@ -12,3 +12,5 @@ __pycache__/
 # Archivos del sistema operativo
 Thumbs.db
 .DS_Store
+
+etl_development.md

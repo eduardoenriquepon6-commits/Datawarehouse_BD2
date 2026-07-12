@@ -1,13 +1,18 @@
 import sys
+import pandas as pd
 from src.ui.console import mostrar_cabecera, mostrar_exito, mostrar_error, mostrar_advertencia
 from src.ui.menus import (
     menu_principal, menu_tipo_extraccion,
     seleccionar_tabla_origen, seleccionar_columnas,
-    ingresar_sql_custom
+    ingresar_sql_custom, menu_configurar_transformaciones
 )
 from src.database.connection import obtener_conexion_oltp, obtener_conexion_olap
 from src.database.queries import listar_tablas_origen, listar_columnas_tabla
 from src.extractor.extractor import extraer_datos_por_tabla, extraer_datos_por_sql
+from src.transformer.transformer import (
+    rows_to_dataframe, clasificar_columnas,
+    aplicar_transformacion
+)
 
 
 def ejecutar_prueba_conexiones():
@@ -85,6 +90,37 @@ def flujo_extraccion_por_sql(conexion):
         return None, None
 
 
+def flujo_transformacion(columnas, filas):
+    mostrar_cabecera()
+    df = rows_to_dataframe(columnas, filas)
+    clasificacion = clasificar_columnas(df)
+
+    print("\nColumnas disponibles y sus tipos detectados:")
+    for tipo, cols in clasificacion.items():
+        if cols:
+            print(f"  [{tipo}] {', '.join(cols)}")
+    print()
+
+    configs = menu_configurar_transformaciones(df, clasificacion)
+    if not configs:
+        mostrar_advertencia("No se configuraron transformaciones. Los datos quedan sin cambios.")
+        return df
+
+    for cfg in configs:
+        col = cfg['columna']
+        tipo = cfg['tipo']
+        valor = cfg.get('valor')
+        try:
+            df = aplicar_transformacion(df, col, tipo, valor)
+            mostrar_exito(f"Transformacion '{tipo}' aplicada a columna '{col}'.")
+        except Exception:
+            mostrar_error("Transformacion", f"Error al aplicar transformacion a la columna '{col}'.")
+
+    mostrar_exito(f"Todas las transformaciones aplicadas correctamente a {len(configs)} columna(s).")
+    input("\nPresione Enter para continuar...")
+    return df
+
+
 def iniciar_flujo_etl():
     conexion = obtener_conexion_oltp()
     if not conexion:
@@ -101,12 +137,14 @@ def iniciar_flujo_etl():
             elif tipo == "tabla":
                 columnas, filas = flujo_extraccion_por_tabla(conexion)
                 if columnas is not None:
-                    print("\n[Fase Futura] Los datos extraidos estan listos para la etapa de transformacion...")
+                    df_transformado = flujo_transformacion(columnas, filas)
+                    print(f"\n[Fase Futura] Datos transformados listos para carga. Total registros: {len(df_transformado)}")
                     input("\nPresione Enter para volver...")
             elif tipo == "sql_custom":
                 columnas, filas = flujo_extraccion_por_sql(conexion)
                 if columnas is not None:
-                    print("\n[Fase Futura] Los datos extraidos estan listos para la etapa de transformacion...")
+                    df_transformado = flujo_transformacion(columnas, filas)
+                    print(f"\n[Fase Futura] Datos transformados listos para carga. Total registros: {len(df_transformado)}")
                     input("\nPresione Enter para volver...")
     finally:
         conexion.close()
