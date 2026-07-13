@@ -141,6 +141,38 @@ def _menu_transformacion_columna(columna, tipo):
     return None
 
 
+def seleccionar_tabla_destino(tablas: list) -> str:
+    opcion = questionary.select(
+        "Seleccione la tabla de destino en el Data Warehouse (OLAP):",
+        choices=[questionary.Choice(t, value=t) for t in tablas] + [
+            questionary.Choice("<-- Volver", value="volver")
+        ]
+    ).ask()
+    return opcion
+
+
+def menu_mapeo_columnas(cols_origen: list, cols_destino: list) -> dict:
+    mapeo = {}
+    for col_origen in cols_origen:
+        opciones = [questionary.Choice(f"{c}", value=c) for c in cols_destino]
+        opciones.append(questionary.Choice("No mapear esta columna", value=None))
+        seleccion = questionary.select(
+            f"Seleccione la columna de destino para '{col_origen}':",
+            choices=opciones
+        ).ask()
+        if seleccion is not None:
+            mapeo[col_origen] = seleccion
+    return mapeo
+
+
+def menu_seleccionar_llave(columnas: list) -> str:
+    seleccion = questionary.select(
+        "Seleccione la columna que actuara como Llave de Negocio para la carga incremental:",
+        choices=[questionary.Choice(c, value=c) for c in columnas]
+    ).ask()
+    return seleccion
+
+
 def ingresar_sql_custom() -> str:
     console.print("[bold yellow]Instrucciones:[/bold yellow] Escriba o pegue su consulta SQL.")
     console.print("Para finalizar, presione [bold]Enter[/bold] dos veces seguidas.\n")

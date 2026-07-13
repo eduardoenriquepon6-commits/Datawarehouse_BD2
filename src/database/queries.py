@@ -71,3 +71,22 @@ def listar_tablas_destino(conexion: pyodbc.Connection):
     tablas = [f"{row.TABLE_SCHEMA}.{row.TABLE_NAME}" for row in cursor.fetchall()]
     cursor.close()
     return tablas
+
+
+def listar_columnas_obligatorias_destino(conexion: pyodbc.Connection, tabla_completa: str):
+    esquema, tabla = tabla_completa.split(".")
+    query = """
+        SELECT c.COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS c
+        WHERE c.TABLE_SCHEMA = ?
+          AND c.TABLE_NAME = ?
+          AND c.IS_NULLABLE = 'NO'
+          AND c.COLUMN_DEFAULT IS NULL
+          AND COLUMNPROPERTY(OBJECT_ID(CONCAT(?, '.', ?)), c.COLUMN_NAME, 'IsIdentity') = 0
+        ORDER BY c.ORDINAL_POSITION
+    """
+    cursor = conexion.cursor()
+    cursor.execute(query, (esquema, tabla, esquema, tabla))
+    columnas = [row.COLUMN_NAME for row in cursor.fetchall()]
+    cursor.close()
+    return columnas
