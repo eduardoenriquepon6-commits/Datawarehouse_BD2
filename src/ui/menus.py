@@ -67,6 +67,21 @@ def seleccionar_columnas(columnas_con_tipo: list) -> list:
     return seleccionadas if seleccionadas else []
 
 
+def menu_preguntar_si_transformar():
+    return questionary.confirm(
+        "Desea aplicar una transformacion a alguna columna?",
+        default=True
+    ).ask()
+
+
+def menu_seleccionar_columna(columnas):
+    seleccion = questionary.select(
+        "Seleccione la columna que desea transformar:",
+        choices=[questionary.Choice(c, value=c) for c in columnas]
+    ).ask()
+    return seleccion
+
+
 def menu_configurar_transformaciones(df, clasificacion):
     todas = list(df.columns)
     if not todas:
@@ -83,7 +98,7 @@ def menu_configurar_transformaciones(df, clasificacion):
     configs = []
     for col in cols_a_transformar:
         tipo = _determinar_tipo_columna(col, clasificacion)
-        config = _menu_transformacion_columna(col, tipo)
+        config = _menu_transformacion_columna(col, tipo, todas)
         if config:
             configs.append(config)
     return configs
@@ -96,7 +111,51 @@ def _determinar_tipo_columna(columna, clasificacion):
     return 'otros'
 
 
-def _menu_transformacion_columna(columna, tipo):
+def _menu_concatenar_entre_columnas(columna, todas_columnas):
+    otras = [c for c in todas_columnas if c != columna]
+    if not otras:
+        console.print("[yellow]No hay otras columnas disponibles para concatenar.[/yellow]")
+        return None
+
+    otra_col = questionary.select(
+        f"Seleccione la columna con la que desea concatenar '{columna}':",
+        choices=[questionary.Choice(c, value=c) for c in otras]
+    ).ask()
+
+    separador = questionary.select(
+        "Seleccione el separador entre ambas columnas:",
+        choices=[
+            questionary.Choice("Espacio (' ')", value=" "),
+            questionary.Choice("Guion ('-')", value="-"),
+            questionary.Choice("Coma (', ')", value=", "),
+            questionary.Choice("Sin separador", value=""),
+            questionary.Choice("Personalizado", value="personalizado")
+        ]
+    ).ask()
+
+    if separador == "personalizado":
+        separador = questionary.text("Ingrese el separador personalizado:").ask() or ""
+
+    nueva_col = questionary.text(
+        "Ingrese el nombre (Alias) de la nueva columna resultante:",
+        default=f"{columna}_{otra_col}"
+    ).ask()
+
+    if not nueva_col:
+        nueva_col = f"{columna}_{otra_col}"
+
+    return {
+        'columna': columna,
+        'tipo': 'concatenar_columna',
+        'valor': {
+            'otra_columna': otra_col,
+            'separador': separador,
+            'nueva_columna': nueva_col
+        }
+    }
+
+
+def _menu_transformacion_columna(columna, tipo, todas_columnas=None):
     if tipo == 'fecha':
         seleccion = questionary.select(
             f"Transformacion para columna de fecha '{columna}':",
@@ -116,12 +175,17 @@ def _menu_transformacion_columna(columna, tipo):
             choices=[
                 questionary.Choice("Convertir a mayuscula", value="mayuscula"),
                 questionary.Choice("Convertir a minuscula", value="minuscula"),
-                questionary.Choice("Concatenar con texto adicional", value="concatenar"),
+                questionary.Choice("Concatenar con otra columna", value="concatenar_columna"),
+                questionary.Choice("Concatenar con texto estatico", value="concatenar"),
                 questionary.Choice("Saltar esta columna", value="saltar")
             ]
         ).ask()
-        if seleccion == "concatenar":
-            valor = questionary.text(f"Ingrese el texto a concatenar al final del campo '{columna}':").ask()
+        if seleccion == "concatenar_columna":
+            if todas_columnas:
+                return _menu_concatenar_entre_columnas(columna, todas_columnas)
+            return None
+        elif seleccion == "concatenar":
+            valor = questionary.text(f"Ingrese el texto estatico a concatenar al final del campo '{columna}':").ask()
             if valor is not None:
                 return {'columna': columna, 'tipo': 'concatenar', 'valor': valor}
         elif seleccion and seleccion != "saltar":
@@ -130,12 +194,17 @@ def _menu_transformacion_columna(columna, tipo):
         seleccion = questionary.select(
             f"Transformacion para columna '{columna}':",
             choices=[
-                questionary.Choice("Concatenar con texto adicional", value="concatenar"),
+                questionary.Choice("Concatenar con otra columna", value="concatenar_columna"),
+                questionary.Choice("Concatenar con texto estatico", value="concatenar"),
                 questionary.Choice("Saltar esta columna", value="saltar")
             ]
         ).ask()
-        if seleccion == "concatenar":
-            valor = questionary.text(f"Ingrese el texto a concatenar al final del campo '{columna}':").ask()
+        if seleccion == "concatenar_columna":
+            if todas_columnas:
+                return _menu_concatenar_entre_columnas(columna, todas_columnas)
+            return None
+        elif seleccion == "concatenar":
+            valor = questionary.text(f"Ingrese el texto estatico a concatenar al final del campo '{columna}':").ask()
             if valor is not None:
                 return {'columna': columna, 'tipo': 'concatenar', 'valor': valor}
     return None

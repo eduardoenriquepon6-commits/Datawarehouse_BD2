@@ -7,7 +7,8 @@ from src.ui.menus import (
     seleccionar_tabla_origen, seleccionar_columnas,
     ingresar_sql_custom, menu_configurar_transformaciones,
     seleccionar_tabla_destino, menu_mapeo_columnas,
-    menu_seleccionar_llave
+    menu_seleccionar_llave, menu_preguntar_si_transformar,
+    menu_seleccionar_columna, _menu_transformacion_columna
 )
 from src.database.connection import obtener_conexion_oltp, obtener_conexion_olap
 from src.database.queries import (
@@ -17,7 +18,7 @@ from src.database.queries import (
 from src.extractor.extractor import extraer_datos_por_tabla, extraer_datos_por_sql
 from src.transformer.transformer import (
     rows_to_dataframe, clasificar_columnas,
-    aplicar_transformacion
+    aplicar_transformacion, obtener_tipo_columna
 )
 from src.loader.loader import cargar_datos_incrementales
 
@@ -98,37 +99,56 @@ def flujo_extraccion_por_sql(conexion):
 
 
 def flujo_transformacion(columnas, filas):
-    mostrar_cabecera()
     df = rows_to_dataframe(columnas, filas)
-    clasificacion = clasificar_columnas(df)
+    columnas_consumidas = set()
 
-    console.print("\n[bold]Columnas disponibles y sus tipos detectados:[/bold]")
-    for tipo, cols in clasificacion.items():
-        if cols:
-            console.print(f"  [cyan]{tipo}[/cyan]: {', '.join(cols)}")
-    console.print()
+    while True:
+        mostrar_cabecera()
+        clasificacion = clasificar_columnas(df)
+        todas = list(df.columns)
+        disponibles = [c for c in todas if c not in columnas_consumidas]
 
-    configs = menu_configurar_transformaciones(df, clasificacion)
-    if not configs:
-        mostrar_advertencia("No se configuraron transformaciones. Los datos quedan sin cambios.")
-        return df
+        if not disponibles:
+            console.print("\n[bold yellow]No hay columnas disponibles para transformar.[/bold yellow]\n")
+            break
 
-    for cfg in configs:
-        col = cfg['columna']
-        tipo = cfg['tipo']
-        valor = cfg.get('valor')
+        console.print("\n[bold]Columnas disponibles y sus tipos detectados:[/bold]")
+        for tipo, cols in clasificacion.items():
+            cols_filt = [c for c in cols if c in disponibles]
+            if cols_filt:
+                console.print(f"  [cyan]{tipo}[/cyan]: {', '.join(cols_filt)}")
+        console.print()
+
+        if not menu_preguntar_si_transformar():
+            break
+
+        col = menu_seleccionar_columna(disponibles)
+        if col is None:
+            break
+
+        tipo_col = obtener_tipo_columna(col, clasificacion)
+        config = _menu_transformacion_columna(col, tipo_col, todas)
+
+        if config is None:
+            continue
+
         try:
-            df = aplicar_transformacion(df, col, tipo, valor)
-            mostrar_exito(f"Transformacion '{tipo}' aplicada a columna '{col}'.")
+            df = aplicar_transformacion(df, config['columna'], config['tipo'], config.get('valor'))
+            mostrar_exito(f"Transformacion '{config['tipo']}' aplicada a columna '{config['columna']}'.")
         except Exception:
-            mostrar_error("Transformacion", f"Error al aplicar transformacion a la columna '{col}'.")
+            mostrar_error("Transformacion", f"Error al aplicar transformacion a la columna '{config['columna']}'.")
+            continue
 
-    mostrar_exito(f"Todas las transformaciones aplicadas correctamente a {len(configs)} columna(s).")
-    input("\nPresione Enter para continuar...")
-    return df
+        if config['tipo'] == 'concatenar_columna':
+            columnas_consumidas.add(config['columna'])
+            columnas_consumidas.add(config['valor']['otra_columna'])
+
+    return df, columnas_consumidas
 
 
-def flujo_carga(df):
+def flujo_carga(df, columnas_consumidas=None):
+    if columnas_consumidas is None:
+        columnas_consumidas = set()
     conexion_olap = obtener_conexion_olap()
     if not conexion_olap:
         input("\nPresione Enter para volver...")
@@ -150,7 +170,8 @@ def flujo_carga(df):
 
             mostrar_cabecera()
             print(f"Mapeando columnas hacia {tabla}...\n")
-            mapeo = menu_mapeo_columnas(df.columns.tolist(), columnas_destino)
+            columnas_origen = [c for c in df.columns.tolist() if c not in columnas_consumidas]
+            mapeo = menu_mapeo_columnas(columnas_origen, columnas_destino)
 
             if not mapeo:
                 mostrar_advertencia("Debe mapear al menos una columna para continuar.")
@@ -217,13 +238,13 @@ def iniciar_flujo_etl():
             elif tipo == "tabla":
                 columnas, filas = flujo_extraccion_por_tabla(conexion)
                 if columnas is not None:
-                    df_transformado = flujo_transformacion(columnas, filas)
-                    flujo_carga(df_transformado)
+                    df_transformado, columnas_consumidas = flujo_transformacion(columnas, filas)
+                    flujo_carga(df_transformado, columnas_consumidas)
             elif tipo == "sql_custom":
                 columnas, filas = flujo_extraccion_por_sql(conexion)
                 if columnas is not None:
-                    df_transformado = flujo_transformacion(columnas, filas)
-                    flujo_carga(df_transformado)
+                    df_transformado, columnas_consumidas = flujo_transformacion(columnas, filas)
+                    flujo_carga(df_transformado, columnas_consumidas)
     finally:
         conexion.close()
 

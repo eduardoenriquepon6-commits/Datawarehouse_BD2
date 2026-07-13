@@ -35,6 +35,11 @@ def aplicar_transformacion(df, columna, tipo, valor_extra=None):
     elif tipo == 'concatenar':
         valor_str = str(valor_extra) if valor_extra is not None else ""
         df[columna] = df[columna].astype(str) + valor_str
+    elif tipo == 'concatenar_columna':
+        otra_col = valor_extra['otra_columna']
+        separador = valor_extra['separador']
+        nueva_col = valor_extra['nueva_columna']
+        df[nueva_col] = df[columna].astype(str) + separador + df[otra_col].astype(str)
     elif tipo == 'extraer_fecha':
         df[columna] = pd.to_datetime(df[columna], errors='coerce')
         if valor_extra == 'year':
