@@ -5,7 +5,7 @@ from src.ui.console import console, mostrar_cabecera, mostrar_exito, mostrar_err
 from src.ui.menus import (
     menu_principal, menu_tipo_extraccion,
     seleccionar_tabla_origen, seleccionar_columnas,
-    ingresar_sql_custom, menu_configurar_transformaciones,
+    ingresar_sql_custom,
     seleccionar_tabla_destino, menu_mapeo_columnas,
     menu_seleccionar_llave, menu_preguntar_si_transformar,
     menu_seleccionar_columna, _menu_transformacion_columna

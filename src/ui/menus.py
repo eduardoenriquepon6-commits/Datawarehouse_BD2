@@ -1,6 +1,19 @@
 import questionary
 from src.ui.console import console
 
+PUNTERO = "\u00bb "
+CHECK_MARCADO = "\u2611 "
+CHECK_VACIO = "\u2610 "
+
+estilo_moderno = questionary.Style([
+    ('qmark', 'fg:#00ffff bold'),
+    ('question', 'bold'),
+    ('pointer', 'fg:#00ffff bold'),
+    ('highlighted', 'fg:#00ffff bold'),
+    ('selected', 'fg:#ffffff'),
+    ('instruction', 'fg:#888888 italic'),
+])
+
 
 def menu_principal() -> str:
     opcion = questionary.select(
@@ -10,15 +23,9 @@ def menu_principal() -> str:
             questionary.Choice("2. Probar Conexiones de Base de Datos", value="probar_db"),
             questionary.Choice("3. Salir", value="salir")
         ],
-        style=questionary.Style([
-            ('qmark', 'fg:cyan bold'),
-            ('question', 'bold'),
-            ('pointer', 'fg:cyan bold'),
-            ('highlighted', 'fg:cyan bold'),
-            ('selected', 'fg:white'),
-        ])
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
-
     return opcion
 
 
@@ -30,13 +37,9 @@ def menu_tipo_extraccion() -> str:
             questionary.Choice("B) Por Consulta SQL Personalizada (Custom Query)", value="sql_custom"),
             questionary.Choice("<-- Volver al menu principal", value="volver")
         ],
-        style=questionary.Style([
-            ('qmark', 'fg:yellow bold'),
-            ('pointer', 'fg:yellow bold'),
-            ('highlighted', 'fg:yellow bold'),
-        ])
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
-
     return opcion
 
 
@@ -45,7 +48,9 @@ def seleccionar_tabla_origen(tablas: list) -> str:
         "Seleccione la tabla de origen para extraer los datos:",
         choices=[questionary.Choice(t, value=t) for t in tablas] + [
             questionary.Choice("<-- Volver", value="volver")
-        ]
+        ],
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
     return opcion
 
@@ -62,7 +67,9 @@ def seleccionar_columnas(columnas_con_tipo: list) -> list:
         )
     seleccionadas = questionary.checkbox(
         "Seleccione los campos que desea extraer (use ESPACIO para marcar):",
-        choices=choices
+        choices=choices,
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
     return seleccionadas if seleccionadas else []
 
@@ -70,38 +77,20 @@ def seleccionar_columnas(columnas_con_tipo: list) -> list:
 def menu_preguntar_si_transformar():
     return questionary.confirm(
         "Desea aplicar una transformacion a alguna columna?",
-        default=True
+        default=True,
+        style=estilo_moderno,
+        qmark="?"
     ).ask()
 
 
 def menu_seleccionar_columna(columnas):
     seleccion = questionary.select(
         "Seleccione la columna que desea transformar:",
-        choices=[questionary.Choice(c, value=c) for c in columnas]
+        choices=[questionary.Choice(c, value=c) for c in columnas],
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
     return seleccion
-
-
-def menu_configurar_transformaciones(df, clasificacion):
-    todas = list(df.columns)
-    if not todas:
-        return []
-
-    cols_a_transformar = questionary.checkbox(
-        "Seleccione las columnas que desea transformar (ESPACIO para marcar, Enter para continuar):",
-        choices=[questionary.Choice(c, value=c) for c in todas]
-    ).ask()
-
-    if not cols_a_transformar:
-        return []
-
-    configs = []
-    for col in cols_a_transformar:
-        tipo = _determinar_tipo_columna(col, clasificacion)
-        config = _menu_transformacion_columna(col, tipo, todas)
-        if config:
-            configs.append(config)
-    return configs
 
 
 def _determinar_tipo_columna(columna, clasificacion):
@@ -119,7 +108,9 @@ def _menu_concatenar_entre_columnas(columna, todas_columnas):
 
     otra_col = questionary.select(
         f"Seleccione la columna con la que desea concatenar '{columna}':",
-        choices=[questionary.Choice(c, value=c) for c in otras]
+        choices=[questionary.Choice(c, value=c) for c in otras],
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
 
     separador = questionary.select(
@@ -130,15 +121,21 @@ def _menu_concatenar_entre_columnas(columna, todas_columnas):
             questionary.Choice("Coma (', ')", value=", "),
             questionary.Choice("Sin separador", value=""),
             questionary.Choice("Personalizado", value="personalizado")
-        ]
+        ],
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
 
     if separador == "personalizado":
-        separador = questionary.text("Ingrese el separador personalizado:").ask() or ""
+        separador = questionary.text(
+            "Ingrese el separador personalizado:",
+            style=estilo_moderno
+        ).ask() or ""
 
     nueva_col = questionary.text(
         "Ingrese el nombre (Alias) de la nueva columna resultante:",
-        default=f"{columna}_{otra_col}"
+        default=f"{columna}_{otra_col}",
+        style=estilo_moderno
     ).ask()
 
     if not nueva_col:
@@ -160,12 +157,14 @@ def _menu_transformacion_columna(columna, tipo, todas_columnas=None):
         seleccion = questionary.select(
             f"Transformacion para columna de fecha '{columna}':",
             choices=[
-                questionary.Choice("Extraer solo el año", value="year"),
+                questionary.Choice("Extraer solo el a\u00f1o", value="year"),
                 questionary.Choice("Extraer solo el mes", value="month"),
                 questionary.Choice("Extraer solo el dia", value="day"),
                 questionary.Choice("Extraer solo la hora", value="hour"),
                 questionary.Choice("Saltar esta columna", value="saltar")
-            ]
+            ],
+            style=estilo_moderno,
+            pointer=PUNTERO
         ).ask()
         if seleccion and seleccion != "saltar":
             return {'columna': columna, 'tipo': 'extraer_fecha', 'valor': seleccion}
@@ -178,14 +177,19 @@ def _menu_transformacion_columna(columna, tipo, todas_columnas=None):
                 questionary.Choice("Concatenar con otra columna", value="concatenar_columna"),
                 questionary.Choice("Concatenar con texto estatico", value="concatenar"),
                 questionary.Choice("Saltar esta columna", value="saltar")
-            ]
+            ],
+            style=estilo_moderno,
+            pointer=PUNTERO
         ).ask()
         if seleccion == "concatenar_columna":
             if todas_columnas:
                 return _menu_concatenar_entre_columnas(columna, todas_columnas)
             return None
         elif seleccion == "concatenar":
-            valor = questionary.text(f"Ingrese el texto estatico a concatenar al final del campo '{columna}':").ask()
+            valor = questionary.text(
+                f"Ingrese el texto estatico a concatenar al final del campo '{columna}':",
+                style=estilo_moderno
+            ).ask()
             if valor is not None:
                 return {'columna': columna, 'tipo': 'concatenar', 'valor': valor}
         elif seleccion and seleccion != "saltar":
@@ -197,14 +201,19 @@ def _menu_transformacion_columna(columna, tipo, todas_columnas=None):
                 questionary.Choice("Concatenar con otra columna", value="concatenar_columna"),
                 questionary.Choice("Concatenar con texto estatico", value="concatenar"),
                 questionary.Choice("Saltar esta columna", value="saltar")
-            ]
+            ],
+            style=estilo_moderno,
+            pointer=PUNTERO
         ).ask()
         if seleccion == "concatenar_columna":
             if todas_columnas:
                 return _menu_concatenar_entre_columnas(columna, todas_columnas)
             return None
         elif seleccion == "concatenar":
-            valor = questionary.text(f"Ingrese el texto estatico a concatenar al final del campo '{columna}':").ask()
+            valor = questionary.text(
+                f"Ingrese el texto estatico a concatenar al final del campo '{columna}':",
+                style=estilo_moderno
+            ).ask()
             if valor is not None:
                 return {'columna': columna, 'tipo': 'concatenar', 'valor': valor}
     return None
@@ -215,7 +224,9 @@ def seleccionar_tabla_destino(tablas: list) -> str:
         "Seleccione la tabla de destino en el Data Warehouse (OLAP):",
         choices=[questionary.Choice(t, value=t) for t in tablas] + [
             questionary.Choice("<-- Volver", value="volver")
-        ]
+        ],
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
     return opcion
 
@@ -227,7 +238,9 @@ def menu_mapeo_columnas(cols_origen: list, cols_destino: list) -> dict:
         opciones.append(questionary.Choice("No mapear esta columna", value=None))
         seleccion = questionary.select(
             f"Seleccione la columna de destino para '{col_origen}':",
-            choices=opciones
+            choices=opciones,
+            style=estilo_moderno,
+            pointer=PUNTERO
         ).ask()
         if seleccion is not None:
             mapeo[col_origen] = seleccion
@@ -237,7 +250,9 @@ def menu_mapeo_columnas(cols_origen: list, cols_destino: list) -> dict:
 def menu_seleccionar_llave(columnas: list) -> str:
     seleccion = questionary.select(
         "Seleccione la columna que actuara como Llave de Negocio para la carga incremental:",
-        choices=[questionary.Choice(c, value=c) for c in columnas]
+        choices=[questionary.Choice(c, value=c) for c in columnas],
+        style=estilo_moderno,
+        pointer=PUNTERO
     ).ask()
     return seleccion
 
