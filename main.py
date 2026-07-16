@@ -214,8 +214,8 @@ def flujo_carga(df, columnas_consumidas=None):
                     )
                 input("\nPresione Enter para volver...")
                 return
-            except RuntimeError:
-                mostrar_error("Carga", "Error durante la insercion de datos en la tabla destino.")
+            except RuntimeError as e:
+                mostrar_error("Carga", str(e))
                 input("\nPresione Enter para volver...")
                 return
     finally:

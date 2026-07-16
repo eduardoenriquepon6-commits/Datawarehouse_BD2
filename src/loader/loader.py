@@ -33,7 +33,10 @@ def cargar_datos_incrementales(
 
     query_insert = f"INSERT INTO {tabla_destino} ({columnas_str}) VALUES ({valores_placeholders})"
 
-    registros_a_insertar = [tuple(x) for x in df_nuevos.to_numpy()]
+    registros_a_insertar = [
+        tuple(None if pd.isna(v) else v.item() if hasattr(v, 'item') else v for v in row)
+        for row in df_nuevos.itertuples(index=False)
+    ]
 
     cursor = conexion.cursor()
     try:
@@ -44,17 +47,21 @@ def cargar_datos_incrementales(
     except pyodbc.Error as e:
         conexion.rollback()
         sqlstate = e.args[0] if e.args else '00000'
+        error_msg = str(e)
         if sqlstate == '23000':
             raise RuntimeError(
-                "Violacion de restriccion en la base de datos destino. "
-                "Revise que todas las columnas obligatorias esten mapeadas "
-                "y que no haya valores duplicados en la llave de negocio."
+                f"Violacion de restriccion en la base de datos destino. "
+                f"Detalle: {error_msg}"
             ) from None
         elif sqlstate == '22001':
             raise RuntimeError(
-                "El tamano de los datos excede el limite permitido en la tabla destino."
+                f"El tamano de los datos excede el limite permitido en la tabla destino. "
+                f"Detalle: {error_msg}"
             ) from None
         else:
-            raise RuntimeError("Error en la base de datos destino durante la insercion de datos.") from None
+            raise RuntimeError(
+                f"Error en la base de datos destino durante la insercion de datos. "
+                f"Detalle: {error_msg}"
+            ) from None
     finally:
         cursor.close()
